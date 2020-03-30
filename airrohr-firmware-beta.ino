@@ -2910,7 +2910,7 @@ while (!serialSDS.available()) {Debug.println("Wait for Serial");}
                             }
                         Debug.println();
 
-                uint16_t pm1_serial = word(data[9],data[10]);
+      uint16_t pm1_serial = word(data[9],data[10]);
       uint16_t pm25_serial = word(data[11],data[12]);
       uint16_t pm10_serial =  word(data[13],data[14]);
       
