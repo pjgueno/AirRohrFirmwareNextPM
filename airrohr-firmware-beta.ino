@@ -2809,9 +2809,10 @@ static void fetchSensorNPM(String& s) {
               }
           Debug.println();
 
+      
 
-      if(data == answer_stop ){
-        Debug.print("STOP");
+      if(memcmp(data,answer_stop,4)==0){
+        Debug.println("STOP");
         is_NPM_running = false;
       }
     break;
@@ -2856,9 +2857,10 @@ while (!serialSDS.available()) {Debug.println("Wait for Serial");}
               }
           Debug.println();
 
-
-      if(data == answer_start ){
-        Debug.print("START");
+      
+      
+      if(memcmp(data,answer_start,4)==0){
+        Debug.println("START");
         is_NPM_running = true;
         starttime_NPM = millis();
         last_NPM = starttime_NPM -1000;
@@ -2870,8 +2872,11 @@ while (!serialSDS.available()) {Debug.println("Wait for Serial");}
    
     }else{
       Debug.println("cas3");
+      Debug.println(msSince(starttime_NPM));
     
-    if (msSince(starttime_NPM) > WARMUPTIME_NPM_MS && msSince(last_NPM) >= SAMPLETIME_NPM_MS && msSince(starttime_NPM) < (WARMUPTIME_NPM_MS +READINGTIME_NPM_MS) && npm_val_count < 10 && newCmdNPM == true) {
+    if (msSince(starttime_NPM) > WARMUPTIME_NPM_MS && msSince(last_NPM) >= SAMPLETIME_NPM_MS && npm_val_count < 10 && newCmdNPM == true) {
+
+      //&& msSince(starttime_NPM) < (WARMUPTIME_NPM_MS +READINGTIME_NPM_MS)
 
       uint8_t data[16];
       serialSDS.flush();
@@ -2921,7 +2926,7 @@ while (!serialSDS.available()) {Debug.println("Wait for Serial");}
           UPDATE_MIN_MAX(npm_pm25_min, npm_pm25_max, pm25_serial);
           UPDATE_MIN_MAX(npm_pm10_min, npm_pm10_max, pm10_serial);
           
-                  Debug.print("MEASURE");
+                  Debug.println("MEASURE");
                   newCmdNPM = true;
                   npm_val_count += 1;
                   last_NPM = millis();
@@ -2948,25 +2953,28 @@ while (!serialSDS.available()) {Debug.println("Wait for Serial");}
          }
        }
    }else{
+
+      Debug.println("EXIT cas3");
+
       
 if (msSince(starttime_NPM) <= WARMUPTIME_NPM_MS){
-      Serial.println("Wait 15 seconds");
+      Debug.println("Wait 15 seconds");
       }
 
       if (msSince(last_NPM) < SAMPLETIME_NPM_MS){
-      Serial.println("Wait 1 seconds");
+      Debug.println("Wait 1 seconds");
       }
 
-      if (msSince(starttime_NPM) >= WARMUPTIME_NPM_MS + READINGTIME_NPM_MS){
-      Serial.println("More than 30 seconds reading");
-      }
+//      if (msSince(starttime_NPM) >= WARMUPTIME_NPM_MS + READINGTIME_NPM_MS){
+//      Debug.println("More than 15 seconds reading");
+//      }
 
       if (npm_val_count >= 10){
-      Serial.println("Already 10 measures");
+      Debug.println("Already 10 measures");
       }
 
       if (newCmdNPM == false){
-      Serial.println("newCmdNPM == false)");
+      Debug.println("newCmdNPM == false)");
       }
       
       }
@@ -3043,9 +3051,8 @@ if (msSince(starttime_NPM) <= WARMUPTIME_NPM_MS){
               }
           Debug.println();
 
-
-      if(data == answer_stop ){
-        Debug.print("STOP");
+      if(memcmp(data,answer_stop,4)==0){
+        Debug.println("STOP");
         is_NPM_running = false;
         npm_val_count = 0;
       }
@@ -3951,14 +3958,17 @@ static void powerOnTestSensors() {
               }
           Debug.println();
 
-      if(data == answer_sleep){
+              
+
+
+      if(memcmp(data,answer_sleep,4)==0){
         serialSDS.flush();
         is_NPM_running = false;
-        Debug.print("SLEEP");
-       }else if(data == answer_power){
+        Debug.println("SLEEP");
+       }else if(memcmp(data,answer_power,4)==0){
         serialSDS.flush();
         is_NPM_running = true;
-        Debug.print("POWER ON");
+        Debug.println("POWER ON");
        }else{
         digitalWrite(PIN_CS, HIGH);
         delay(500);
@@ -4300,7 +4310,7 @@ void setup(void) {
 
 	starttime = millis();									// store the start time
 	last_update_attempt = time_point_device_start_ms = starttime;
-	last_display_millis = starttime_SDS = starttime_NPM = starttime;
+	last_display_millis = starttime_SDS = starttime;
 }
 
 /*****************************************************************
@@ -4377,7 +4387,6 @@ void loop(void) {
 	if (msSince(starttime_SDS) > SAMPLETIME_SDS_MS || send_now) {
   
 		starttime_SDS = act_milli;
-    starttime_NPM = act_milli;
     
 		if (cfg::sds_read) {
 			fetchSensorSDS(result_SDS);
