@@ -403,6 +403,9 @@ int hpm_pm25_min = 20000;
 uint16_t npm_pm1_sum = 0;
 uint16_t npm_pm10_sum = 0;
 uint16_t npm_pm25_sum = 0;
+uint16_t npm_pm1_sum_pcs = 0;
+uint16_t npm_pm10_sum_pcs = 0;
+uint16_t npm_pm25_sum_pcs = 0;
 uint16_t npm_val_count = 0;
 uint16_t npm_pm1_max = 0;
 uint16_t npm_pm1_min = 20000;
@@ -410,6 +413,12 @@ uint16_t npm_pm10_max = 0;
 uint16_t npm_pm10_min = 20000;
 uint16_t npm_pm25_max = 0;
 uint16_t npm_pm25_min = 20000;
+uint16_t npm_pm1_max_pcs = 0;
+uint16_t npm_pm1_min_pcs = 60000;
+uint16_t npm_pm10_max_pcs = 0;
+uint16_t npm_pm10_min_pcs = 60000;
+uint16_t npm_pm25_max_pcs = 0;
+uint16_t npm_pm25_min_pcs = 60000;
 bool newCmdNPM = true;
 
 float last_value_SPS30_P0 = -1.0;
@@ -452,6 +461,9 @@ float last_value_HPM_P2 = -1.0;
 float last_value_NPM_P0 = -1.0;
 float last_value_NPM_P1 = -1.0;
 float last_value_NPM_P2 = -1.0;
+float last_value_NPM_N0 = -1.0;
+float last_value_NPM_N1 = -1.0;
+float last_value_NPM_N2 = -1.0;
 double last_value_GPS_lat = -200.0;
 double last_value_GPS_lon = -200.0;
 double last_value_GPS_alt = -1000.0;
@@ -1421,9 +1433,12 @@ static void webserver_values() {
 
  if (cfg::npm_read) {
    page_content += FPSTR(EMPTY_ROW);
-   add_table_pm_value(FPSTR(SENSORS_NPM), FPSTR(WEB_PM1), last_value_NPM_P2);
+   add_table_pm_value(FPSTR(SENSORS_NPM), FPSTR(WEB_PM1), last_value_NPM_P0);
     add_table_pm_value(FPSTR(SENSORS_NPM), FPSTR(WEB_PM25), last_value_NPM_P2);
     add_table_pm_value(FPSTR(SENSORS_NPM), FPSTR(WEB_PM10), last_value_NPM_P1);
+   add_table_nc_value(FPSTR(SENSORS_NPM), FPSTR(WEB_NC1k0), last_value_NPM_N0);
+   add_table_nc_value(FPSTR(SENSORS_NPM), FPSTR(WEB_NC2k5), last_value_NPM_N2);
+    add_table_nc_value(FPSTR(SENSORS_NPM), FPSTR(WEB_NC10), last_value_NPM_N1);
   }
 	if (cfg::sps30_read) {
 		page_content += FPSTR(EMPTY_ROW);
@@ -2775,7 +2790,6 @@ static void fetchSensorNPM(String& s) {
   debug_outln_verbose(FPSTR(DBG_TXT_START_READING), FPSTR(SENSORS_NPM));
   
   if (msSince(starttime) < (cfg::sending_intervall_ms - (WARMUPTIME_NPM_MS + READINGTIME_NPM_MS))) {
-    Debug.println("cas1");
     if (is_NPM_running) {
 
     const uint8_t constexpr answer_stop[4] = { 0x81, 0x15, 0x01, 0x69 };
@@ -2783,36 +2797,31 @@ static void fetchSensorNPM(String& s) {
     serialSDS.flush();
     NPM_cmd(PmSensorCmd2::Change);
     
- while (!serialSDS.available()) {Debug.println("Wait for Serial");}
+ while (!serialSDS.available()) {debug_outln_info(F("Wait for Serial..."));}
 
  while (serialSDS.available() > 0){
-//    uint8_t data[4];
 //    yield_for_serial_buffer(sizeof(data));
     unsigned r = serialSDS.readBytes(data,sizeof(data));
 
-//      Debug.println(r);
-//      Debug.println(data[0],HEX);
-//      Debug.println(NPM_checksum_valid_4(data));
-
       if (r == sizeof(data) && NPM_checksum_valid_4(data)) {
 
-         Debug.print("Read: ");
-        for (int i = 0; i < sizeof(data); i++)
+       String reader = "Read: ";
+
+       for (int i = 0; i < sizeof(data); i++)
             {
-              Debug.print("0x");
+              reader += "0x";
               if (data[i] < 0x10)
-                  Debug.print("0");
-              Debug.print(data[i], HEX);
-              if(i!=3){
-              Debug.print(", ");
+                  reader += "0";
+              reader += String(data[i], HEX);
+              if(i!=(sizeof(data)-1)){
+              reader += ", ";
               }
               }
-          Debug.println();
 
+       debug_outln(reader, DEBUG_MAX_INFO);
       
-
       if(memcmp(data,answer_stop,4)==0){
-        Debug.println("STOP");
+        debug_outln_info(F("Next PM Stop..."));
         is_NPM_running = false;
       }
     break;
@@ -2820,7 +2829,6 @@ static void fetchSensorNPM(String& s) {
     }
  }
   } else {
-    Debug.println("cas2");
     
     if (!is_NPM_running) {
       const uint8_t constexpr answer_start[4] = { 0x81, 0x15, 0x00, 0x6A };
@@ -2828,39 +2836,33 @@ static void fetchSensorNPM(String& s) {
       serialSDS.flush();
       NPM_cmd(PmSensorCmd2::Change);
 
+        while (!serialSDS.available()) {debug_outln_info(F("Wait for Serial..."));}
+        
+        while (serialSDS.available() > 0){
+        //    yield_for_serial_buffer(sizeof(data));
+            unsigned r = serialSDS.readBytes(data,sizeof(data));
+            
+              if (r == sizeof(data) && NPM_checksum_valid_4(data)) {
+    
 
+        String reader = "Read: ";
 
-
-while (!serialSDS.available()) {Debug.println("Wait for Serial");}
-
- while (serialSDS.available() > 0){
-//    uint8_t data[4];
-//    yield_for_serial_buffer(sizeof(data));
-    unsigned r = serialSDS.readBytes(data,sizeof(data));
-
-//      Debug.println(r);
-//      Debug.println(data[0],HEX);
-//      Debug.println(NPM_checksum_valid_4(data));
-
-      if (r == sizeof(data) && NPM_checksum_valid_4(data)) {
-
-         Debug.print("Read: ");
-        for (int i = 0; i < sizeof(data); i++)
+       for (int i = 0; i < sizeof(data); i++)
             {
-              Debug.print("0x");
+              reader += "0x";
               if (data[i] < 0x10)
-                  Debug.print("0");
-              Debug.print(data[i], HEX);
-              if(i!=3){
-              Debug.print(", ");
+                  reader += "0";
+              reader += String(data[i], HEX);
+              if(i!=(sizeof(data)-1)){
+              reader += ", ";
               }
               }
-          Debug.println();
 
-      
+       debug_outln(reader, DEBUG_MAX_INFO);
+              
       
       if(memcmp(data,answer_start,4)==0){
-        Debug.println("START");
+        debug_outln_info(F("Next PM Start..."));
         is_NPM_running = true;
         starttime_NPM = millis();
         last_NPM = starttime_NPM -1000;
@@ -2871,8 +2873,6 @@ while (!serialSDS.available()) {Debug.println("Wait for Serial");}
     }
    
     }else{
-      Debug.println("cas3");
-      Debug.println(msSince(starttime_NPM));
     
     if (msSince(starttime_NPM) > WARMUPTIME_NPM_MS && msSince(last_NPM) >= SAMPLETIME_NPM_MS && npm_val_count < 10 && newCmdNPM == true) {
 
@@ -2882,51 +2882,75 @@ while (!serialSDS.available()) {Debug.println("Wait for Serial");}
       serialSDS.flush();
       NPM_cmd(PmSensorCmd2::Concentration);
       newCmdNPM = false;
-      while (!serialSDS.available()) {Debug.println("Wait for Serial");}
+      while (!serialSDS.available()) {debug_outln_info(F("Wait for Serial..."));}
 
 
           
               while (serialSDS.available() > 0){
-              //    uint8_t data[4];
               //    yield_for_serial_buffer(sizeof(data));
                   unsigned r = serialSDS.readBytes(data,sizeof(data));
-              
-              //      Debug.println(r);
-              //      Debug.println(data[0],HEX);
-              //      Debug.println(NPM_checksum_valid_4(data));
-              
-                    if (r == sizeof(data) && NPM_checksum_valid_16(data)) {
-              
-                       Debug.print("Read: ");
-                      for (int i = 0; i < sizeof(data); i++)
-                          {
-                            Debug.print("0x");
-                            if (data[i] < 0x10)
-                                Debug.print("0");
-                            Debug.print(data[i], HEX);
-                            if(i!=15){
-                            Debug.print(", ");
-                            }
-                            }
-                        Debug.println();
 
+                    if (r == sizeof(data) && NPM_checksum_valid_16(data)) {
+            
+
+                        String reader = "Read: ";
+
+                       for (int i = 0; i < sizeof(data); i++)
+                            {
+                              reader += "0x";
+                              if (data[i] < 0x10)
+                                  reader += "0";
+                              reader += String(data[i], HEX);
+                              if(i!=(sizeof(data)-1)){
+                              reader += ", ";
+                              }
+                              }
+                
+                       debug_outln(reader, DEBUG_MAX_INFO);
+
+                       byte stateByte = data[2];
+                       String state = "State: ";
+
+                       for (int b = 7; b >= 0; b--)
+                        {
+                          state += String(bitRead(stateByte, b));
+                        }
+
+                       debug_outln(state, DEBUG_MAX_INFO);
+
+      uint16_t N1_serial = word(data[3],data[4]);
+      uint16_t N25_serial = word(data[5],data[6]);
+      uint16_t N10_serial =  word(data[7],data[6]);
+      
       uint16_t pm1_serial = word(data[9],data[10]);
       uint16_t pm25_serial = word(data[11],data[12]);
       uint16_t pm10_serial =  word(data[13],data[14]);
       
-          debug_outln_verbose(F("PM1 (value) : "), String(pm1_serial/10.0f));
-          debug_outln_verbose(F("PM2.5 (value): "), String(pm25_serial/10.0f));
-          debug_outln_verbose(F("PM10 (value) : "), String(pm10_serial/10.0f));
+          debug_outln_verbose(F("PM1 (μg/m3) : "), String(pm1_serial/10.0f));
+          debug_outln_verbose(F("PM2.5 (μg/m3): "), String(pm25_serial/10.0f));
+          debug_outln_verbose(F("PM10 (μg/m3) : "), String(pm10_serial/10.0f));
+
+          debug_outln_verbose(F("PM1 (pcs/mL) : "), String(N1_serial));
+          debug_outln_verbose(F("PM2.5 (pcs/mL): "), String(N25_serial));
+          debug_outln_verbose(F("PM10 (pcs/mL) : "), String(N10_serial));
       
-          npm_pm1_sum += pm1_serial;
-          npm_pm25_sum += pm25_serial;
-          npm_pm10_sum += pm10_serial;
+          npm_pm1_sum += pm1_serial/10.0f;
+          npm_pm25_sum += pm25_serial/10.0f;
+          npm_pm10_sum += pm10_serial/10.0f;
+
+          npm_pm1_sum_pcs += pm1_serial;
+          npm_pm25_sum_pcs += pm25_serial;
+          npm_pm10_sum_pcs += pm10_serial;
           
-          UPDATE_MIN_MAX(npm_pm1_min, npm_pm1_max, pm1_serial);
-          UPDATE_MIN_MAX(npm_pm25_min, npm_pm25_max, pm25_serial);
-          UPDATE_MIN_MAX(npm_pm10_min, npm_pm10_max, pm10_serial);
+          UPDATE_MIN_MAX(npm_pm1_min, npm_pm1_max, pm1_serial/10.0f);
+          UPDATE_MIN_MAX(npm_pm25_min, npm_pm25_max, pm25_serial/10.0f);
+          UPDATE_MIN_MAX(npm_pm10_min, npm_pm10_max, pm10_serial/10.0f);
+
+          UPDATE_MIN_MAX(npm_pm1_min_pcs, npm_pm1_max_pcs, N1_serial);
+          UPDATE_MIN_MAX(npm_pm25_min_pcs, npm_pm25_max_pcs, N25_serial);
+          UPDATE_MIN_MAX(npm_pm10_min_pcs, npm_pm10_max_pcs, N10_serial);
           
-                  Debug.println("MEASURE");
+                  debug_outln_info(F("Next PM Measure..."));
                   newCmdNPM = true;
                   npm_val_count += 1;
                   last_NPM = millis();
@@ -2934,74 +2958,85 @@ while (!serialSDS.available()) {Debug.println("Wait for Serial");}
               break;
                 }else if(r == 4 && data[2] == 0x04){
 
-                  Debug.print("Read: ");
-                      for (int i = 0; i < 4; i++)
-                          {
-                            Debug.print("0x");
-                            if (data[i] < 0x10)
-                                Debug.print("0");
-                            Debug.print(data[i], HEX);
-                            if(i!=3){
-                            Debug.print(", ");
-                            }
-                            }
-                        Debug.println();
+
+                       String reader = "Read: ";
+
+                       for (int i = 0; i < 4; i++)
+                            {
+                              reader += "0x";
+                              if (data[i] < 0x10)
+                                  reader += "0";
+                              reader += String(data[i], HEX);
+                              if(i!=3){
+                              reader += ", ";
+                              }
+                              }
+                
+                       debug_outln(reader, DEBUG_MAX_INFO);
+                        
                   
-        Debug.println("Not ready yet to read");
+        debug_outln_info(F("Next PM not ready yet..."));
         newCmdNPM = true;
         break;
          }
        }
-   }else{
-
-      Debug.println("EXIT cas3");
-
-      
-if (msSince(starttime_NPM) <= WARMUPTIME_NPM_MS){
-      Debug.println("Wait 15 seconds");
-      }
-
-      if (msSince(last_NPM) < SAMPLETIME_NPM_MS){
-      Debug.println("Wait 1 seconds");
-      }
-
-//      if (msSince(starttime_NPM) >= WARMUPTIME_NPM_MS + READINGTIME_NPM_MS){
-//      Debug.println("More than 15 seconds reading");
+   }
+   
+//   else{
+//      
+//    if (msSince(starttime_NPM) <= WARMUPTIME_NPM_MS){
+//      Debug.println("Wait 15 seconds");
 //      }
-
-      if (npm_val_count >= 10){
-      Debug.println("Already 10 measures");
-      }
-
-      if (newCmdNPM == false){
-      Debug.println("newCmdNPM == false)");
-      }
-      
-      }
+//
+//      if (msSince(last_NPM) < SAMPLETIME_NPM_MS){
+//      Debug.println("Wait 1 seconds");
+//      }
+//
+////      if (msSince(starttime_NPM) >= WARMUPTIME_NPM_MS + READINGTIME_NPM_MS){
+////      Debug.println("More than 15 seconds reading");
+////      }
+//
+//      if (npm_val_count >= 10){
+//      Debug.println("Already 10 measures");
+//      }
+//
+//      if (newCmdNPM == false){
+//      Debug.println("newCmdNPM == false)");
+//      }
+//      
+//      }
     
-  
-//  const uint8_t constexpr header_sleep[3] = { 0x81, 0x16, 0x01 };
-//  const uint8_t constexpr header_power[3] = { 0x81, 0x16, 0x00 };
-//  const uint8_t constexpr header_stoped[3] = { 0x81, 0x15, 0x01 };
-//  const uint8_t constexpr header_started[3] = { 0x81, 0x15, 0x00 };
-//const uint8_t constexpr header_ready[3] = { 0x81, 0x11, 0x00 }; //after 15s => ready to measure
-//  const uint8_t constexpr header_notready[3] = { 0x81, 0x16, 0x04 }; //before 15s => not ready to measure
   }
   }
   if (send_now) {
     last_value_NPM_P0 = -1.0f;
     last_value_NPM_P1 = -1.0f;
     last_value_NPM_P2 = -1.0f;
+    last_value_NPM_N0 = -1.0f;
+    last_value_NPM_N1 = -1.0f;
+    last_value_NPM_N2 = -1.0f;
+    
+
     if (npm_val_count > 2) {
       npm_pm1_sum = npm_pm1_sum - npm_pm1_min - npm_pm1_max;
       npm_pm10_sum = npm_pm10_sum - npm_pm10_min - npm_pm10_max;
       npm_pm25_sum = npm_pm25_sum - npm_pm25_min - npm_pm25_max;
+      npm_pm1_sum_pcs = npm_pm1_sum_pcs - npm_pm1_min_pcs - npm_pm1_max_pcs;
+      npm_pm10_sum_pcs = npm_pm10_sum_pcs - npm_pm10_min_pcs - npm_pm10_max_pcs;
+      npm_pm25_sum_pcs = npm_pm25_sum_pcs - npm_pm25_min_pcs - npm_pm25_max_pcs;
       npm_val_count = npm_val_count - 2;
     }
     if (npm_val_count > 0) {
       last_value_NPM_P0 = float(npm_pm1_sum) / float(npm_val_count);
       last_value_NPM_P1 = float(npm_pm10_sum) / float(npm_val_count);
       last_value_NPM_P2 = float(npm_pm25_sum) / float(npm_val_count);
+
+      last_value_NPM_N0 = float(npm_pm1_sum_pcs) / float(npm_val_count);
+      last_value_NPM_N1 = float(npm_pm10_sum_pcs) / float(npm_val_count);
+      last_value_NPM_N2 = float(npm_pm25_sum_pcs) / float(npm_val_count);
+
+
+      
       add_Value2Json(s, F("NPM_P0"), F("PM1: "), last_value_NPM_P0);
       add_Value2Json(s, F("NPM_P1"), F("PM10:  "), last_value_NPM_P1);
       add_Value2Json(s, F("NPM_P2"), F("PM2.5: "), last_value_NPM_P2);
@@ -3028,31 +3063,29 @@ if (msSince(starttime_NPM) <= WARMUPTIME_NPM_MS){
  while (!serialSDS.available()) {Debug.println("Wait for Serial");}
 
  while (serialSDS.available() > 0){
-//    uint8_t data[4];
 //    yield_for_serial_buffer(sizeof(data));
     unsigned r = serialSDS.readBytes(data,sizeof(data));
-
-//      Debug.println(r);
-//      Debug.println(data[0],HEX);
-//      Debug.println(NPM_checksum_valid_4(data));
-
+    
       if (r == sizeof(data) && NPM_checksum_valid_4(data)) {
 
-         Debug.print("Read: ");
-        for (int i = 0; i < sizeof(data); i++)
-            {
-              Debug.print("0x");
-              if (data[i] < 0x10)
-                  Debug.print("0");
-              Debug.print(data[i], HEX);
-              if(i!=3){
-              Debug.print(", ");
-              }
-              }
-          Debug.println();
+          String reader = "Read: ";
+
+         for (int i = 0; i < sizeof(data); i++)
+              {
+                reader += "0x";
+                if (data[i] < 0x10)
+                    reader += "0";
+                reader += String(data[i], HEX);
+                if(i!=(sizeof(data)-1)){
+                reader += ", ";
+                }
+                }
+  
+         debug_outln(reader, DEBUG_MAX_INFO);
+          
 
       if(memcmp(data,answer_stop,4)==0){
-        Debug.println("STOP");
+        debug_outln_info(F("Next PM Stop..."));
         is_NPM_running = false;
         npm_val_count = 0;
       }
@@ -3061,16 +3094,10 @@ if (msSince(starttime_NPM) <= WARMUPTIME_NPM_MS){
     } 
     }
 
-
   }
 
   debug_outln_verbose(FPSTR(DBG_TXT_END_READING), FPSTR(SENSORS_NPM));
 }
-
-
-
-
-
 
 
 
@@ -3532,9 +3559,12 @@ static void display_values() {
   if (cfg::npm_read) {
     pm01_value = last_value_NPM_P0;
     pm10_value = last_value_NPM_P1;
-    pm10_sensor = FPSTR(SENSORS_NPM);
     pm25_value = last_value_NPM_P2;
+    pm10_sensor = FPSTR(SENSORS_NPM);
     pm25_sensor = FPSTR(SENSORS_NPM);
+    nc010_value = last_value_NPM_N0;
+    nc100_value = last_value_NPM_N1;
+    nc025_value = last_value_NPM_N2; 
   }
 	if (cfg::sps30_read) {
 		pm10_sensor = FPSTR(SENSORS_SPS30);
@@ -3931,50 +3961,45 @@ static void powerOnTestSensors() {
    debug_outln_info(F("State NPM..."));
    serialSDS.flush();
    NPM_cmd(PmSensorCmd2::State);
-   while (!serialSDS.available()) {Debug.println("Wait for Serial");}
+   while (!serialSDS.available()) {debug_outln_info(F("Wait for Serial..."));}
 
    while (serialSDS.available() > 0){
     
-    //uint8_t data[4];
     //yield_for_serial_buffer(sizeof(data));
     unsigned r = serialSDS.readBytes(data,sizeof(data));
 
-//      Debug.println(r);
-//      Debug.println(data[0],HEX);
-//      Debug.println(NPM_checksum_valid_4(data));
-
       if (r == sizeof(data) && NPM_checksum_valid_4(data)) {
 
-        Debug.print("Read: ");
-        for (int i = 0; i < sizeof(data); i++)
+
+      String reader = "Read: ";
+
+       for (int i = 0; i < sizeof(data); i++)
             {
-              Debug.print("0x");
+              reader += "0x";
               if (data[i] < 0x10)
-                  Debug.print("0");
-              Debug.print(data[i], HEX);
-              if(i!=3){
-              Debug.print(", ");
+                  reader += "0";
+              reader += String(data[i], HEX);
+              if(i!=(sizeof(data)-1)){
+              reader += ", ";
               }
               }
-          Debug.println();
 
-              
-
+       debug_outln(reader, DEBUG_MAX_INFO);
 
       if(memcmp(data,answer_sleep,4)==0){
         serialSDS.flush();
         is_NPM_running = false;
-        Debug.println("SLEEP");
+        debug_outln_info(F("Next PM Sleep..."));
        }else if(memcmp(data,answer_power,4)==0){
         serialSDS.flush();
         is_NPM_running = true;
-        Debug.println("POWER ON");
+        debug_outln_info(F("Next PM Power On..."));
        }else{
         digitalWrite(PIN_CS, HIGH);
         delay(500);
         digitalWrite(PIN_CS, LOW);
         is_NPM_running = true;
-        Debug.println("REBOOT");
+        debug_outln_info(F("Next PM Reboot..."));
         }
 
        break;
@@ -3982,53 +4007,6 @@ static void powerOnTestSensors() {
       }
     }
     }
-        
-//        NPM_cmd(PmSensorCmd2::Change);
-//           while (!serialSDS.available()) {
-//            Debug.println("Wait for Serial");
-//           }
-//           
-//            Debug.println("Ready to read");
-//            
-//            uint8_t data[4];
-//            yield_for_serial_buffer(sizeof(data));
-//            unsigned r = serialSDS.readBytes(data,sizeof(data));
-//        
-//              Debug.println(r);
-//              Debug.println(data[0],HEX);
-//              Debug.println(NPM_checksum_valid_4(data));
-//        
-//              if (r == sizeof(data) && NPM_checksum_valid_4(data)) {
-//        
-//              if(data[2] == 0x00 ){
-//                Debug.print("Started: ");
-//                is_NPM_running = true;
-//                Debug.println(is_NPM_running);
-//                Debug.println("Sleep then Powered ON");
-//              }else{
-//                digitalWrite(PIN_CS, HIGH);
-//                delay(500);
-//                digitalWrite(PIN_CS, LOW);
-//                is_NPM_running = false;
-//                Debug.println("is_NPM_running set to false");
-//                }
-//              //serialSDS.flush();
-//              }
-//      }else if(data[2] == 0x00){
-//      Debug.println("Power ON already");
-//      }
-//      
-
-//      else{
-//        digitalWrite(PIN_CS, HIGH);
-//        delay(500);
-//        digitalWrite(PIN_CS, LOW);
-//        is_NPM_running = false;
-//        Debug.println("is_NPM_running set to false");
-//        }
-      //serialSDS.flush();
-
-
 
 	if (cfg::sps30_read) {
 		debug_outln_info(F("Read SPS30..."));

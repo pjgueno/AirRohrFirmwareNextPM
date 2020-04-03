@@ -498,20 +498,13 @@ bool HPM_cmd(PmSensorCmd cmd) {
 
 
 bool NPM_checksum_valid_4(const uint8_t (&data)[4]) {
-
-//  uint8_t checksum;
-//  for (byte i = 0; i < 16; ++i) {
-//        checksum += data[i];
-//    }
-// 
+//Works only like that...
   uint8_t checksum = data[3] + (data[0] + data[1] + data[2]);
-  //Debug.print("Checksum ");
-  //Debug.println(checksum);
-  
   return (checksum == 0);
 }
 
 bool NPM_checksum_valid_16(const uint8_t (&data)[16]) {
+  //Works only like that...
     uint8_t sum = data[0] + data[1] + data[2] + data[3] + data[4] + data[5] + data[6] + data[7] + data[8] + data[9] + data[10] + data[11] + data[12] + data[13] + data[14] + data[15];
     uint8_t checksum = sum % 0x100;
     return (checksum == 0);
@@ -520,8 +513,6 @@ bool NPM_checksum_valid_16(const uint8_t (&data)[16]) {
 
 void NPM_cmd(PmSensorCmd2 cmd) { 
   
-  //Debug.println("NPM_Command");  
-  //void?
   static constexpr uint8_t state_cmd[] PROGMEM = { //read the current state
     0x81,0x16,0x69
   };
@@ -538,19 +529,15 @@ void NPM_cmd(PmSensorCmd2 cmd) {
   switch (cmd) {
   case PmSensorCmd2::State:
     memcpy_P(buf, state_cmd, cmd_len);
-    Debug.print("State ");
     break;
   case PmSensorCmd2::Change:
     memcpy_P(buf, change_cmd, cmd_len);
-    Debug.print("Change ");
     break;
   case PmSensorCmd2::Concentration:
     memcpy_P(buf, concentration_cmd, cmd_len);
-    Debug.print("Concentration ");
     break;
   }
   serialSDS.write(buf, cmd_len);
-  Debug.println("Write");
 }
 
 
